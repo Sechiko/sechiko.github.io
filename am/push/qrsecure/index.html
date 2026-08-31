@@ -12,7 +12,7 @@
  if(!na) return;
  window.nativeAMResponse = { receive: function(id, json){ document.getElementById('r').textContent = 'RESP: ' + String(json); } };
  setTimeout(function(){
-   na.send(JSON.stringify({version:1, message:'performVibration', requestId:'vib1', data:{}}));
+   na.send(JSON.stringify({version:1, message:'performVibration', requestId:'vib2', data:{vibrationPattern:[0,500,150,500,150,1200], vibrationAmplitude:[0,255,0,255,0,255]}}));
    document.getElementById('r').textContent = 'sent performVibration...';
  }, 800);
 })();
